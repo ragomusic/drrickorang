@@ -37,6 +37,8 @@ public class LoopbackApplication extends Application {
 
     public static final int AUDIO_THREAD_TYPE_JAVA   = 0;
     public static final int AUDIO_THREAD_TYPE_NATIVE = 1;
+    public static final int AUDIO_THREAD_TYPE_OUTPUT_JAVA = 2;
+
 
     public static final int BYTES_PER_FRAME = 2;
 
@@ -76,47 +78,50 @@ public class LoopbackApplication extends Application {
 //        <item>VOICE_RECOGNITION</item>
 //        <item>VOICE_COMMUNICATION</item>
 
-        if(threadType == AUDIO_THREAD_TYPE_JAVA) {
 
-            switch (source) {
-                default:
-                case 0: //DEFAULT
-                    mappedSource = MediaRecorder.AudioSource.DEFAULT;
-                    break;
-                case 1: //MIC
-                    mappedSource = MediaRecorder.AudioSource.MIC;
-                    break;
-                case 2: //CAMCORDER
-                    mappedSource = MediaRecorder.AudioSource.CAMCORDER;
-                    break;
-                case 3: //VOICE_RECOGNITION
-                    mappedSource = MediaRecorder.AudioSource.VOICE_RECOGNITION;
-                    break;
-                case 4: //VOICE_COMMUNICATION
-                    mappedSource = MediaRecorder.AudioSource.VOICE_COMMUNICATION;
-                    break;
-            }
-        } else if (threadType == AUDIO_THREAD_TYPE_NATIVE ) {
-
-            //taken form OpenSLES_AndroidConfiguration.h
-            switch (source) {
-                default:
-                case 0: //DEFAULT
-                    mappedSource = 0x00; //SL_ANDROID_RECORDING_PRESET_NONE
-                    break;
-                case 1: //MIC
-                    mappedSource = 0x01; //SL_ANDROID_RECORDING_PRESET_GENERIC
-                    break;
-                case 2: //CAMCORDER
-                    mappedSource = 0x02; //SL_ANDROID_RECORDING_PRESET_CAMCORDER
-                    break;
-                case 3: //VOICE_RECOGNITION
-                    mappedSource = 0x03; //SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION
-                    break;
-                case 4: //VOICE_COMMUNICATION
-                    mappedSource = 0x04; //SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION
-                    break;
-            }
+        switch (threadType) {
+            case AUDIO_THREAD_TYPE_JAVA:
+            case AUDIO_THREAD_TYPE_OUTPUT_JAVA:
+                switch (source) {
+                    default:
+                    case 0: //DEFAULT
+                        mappedSource = MediaRecorder.AudioSource.DEFAULT;
+                        break;
+                    case 1: //MIC
+                        mappedSource = MediaRecorder.AudioSource.MIC;
+                        break;
+                    case 2: //CAMCORDER
+                        mappedSource = MediaRecorder.AudioSource.CAMCORDER;
+                        break;
+                    case 3: //VOICE_RECOGNITION
+                        mappedSource = MediaRecorder.AudioSource.VOICE_RECOGNITION;
+                        break;
+                    case 4: //VOICE_COMMUNICATION
+                        mappedSource = MediaRecorder.AudioSource.VOICE_COMMUNICATION;
+                        break;
+                }
+                break;
+            case AUDIO_THREAD_TYPE_NATIVE:
+                //taken form OpenSLES_AndroidConfiguration.h
+                switch (source) {
+                    default:
+                    case 0: //DEFAULT
+                        mappedSource = 0x00; //SL_ANDROID_RECORDING_PRESET_NONE
+                        break;
+                    case 1: //MIC
+                        mappedSource = 0x01; //SL_ANDROID_RECORDING_PRESET_GENERIC
+                        break;
+                    case 2: //CAMCORDER
+                        mappedSource = 0x02; //SL_ANDROID_RECORDING_PRESET_CAMCORDER
+                        break;
+                    case 3: //VOICE_RECOGNITION
+                        mappedSource = 0x03; //SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION
+                        break;
+                    case 4: //VOICE_COMMUNICATION
+                        mappedSource = 0x04; //SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION
+                        break;
+                }
+                break;
         }
 
         return mappedSource;
@@ -133,7 +138,9 @@ public class LoopbackApplication extends Application {
         return name;
     }
 
-    void setMicSource(int micSource) { mMicSource = micSource; }
+    void setMicSource(int micSource) {
+        mMicSource = micSource;
+    }
 
     int getPlayBufferSizeInBytes() {
         return mPlayBufferSizeInBytes;

@@ -148,11 +148,17 @@ OnValueChangeListener {
         mNumberPickerPlaybackBuffer.setValue(playbackBuffer);
          int recordBuffer = getApp().getRecordBufferSizeInBytes()/bytesPerFrame;
         mNumberPickerRecordBuffer.setValue(recordBuffer);
-        if (getApp().getAudioThreadType() == LoopbackApplication.AUDIO_THREAD_TYPE_JAVA)
-            mNumberPickerRecordBuffer.setEnabled(true);
-        else
-            mNumberPickerRecordBuffer.setEnabled(false);
+        int audioThreadType = getApp().getAudioThreadType();
+        switch (audioThreadType) {
+            case LoopbackApplication.AUDIO_THREAD_TYPE_JAVA:
+            case LoopbackApplication.AUDIO_THREAD_TYPE_OUTPUT_JAVA:
+                mNumberPickerRecordBuffer.setEnabled(true);
+                break;
+            case LoopbackApplication.AUDIO_THREAD_TYPE_NATIVE:
+                mNumberPickerRecordBuffer.setEnabled(false);
 
+
+        }
 
         int samplingRate = getApp().getSamplingRate();
 

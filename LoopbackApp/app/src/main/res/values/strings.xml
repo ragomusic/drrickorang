@@ -61,6 +61,7 @@
     <string-array name="audioThreadType_array">
         <item>Java</item>
         <item>native (JNI)</item>
+        <item>OUTPUT Java</item>
     </string-array>
 
     <string name="labelPlaybackBuffer">Playback Buffer (Frames)</string>

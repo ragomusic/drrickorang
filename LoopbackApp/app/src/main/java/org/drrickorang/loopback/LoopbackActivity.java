@@ -67,6 +67,8 @@ public class LoopbackActivity extends Activity {
 
     private static final int SETTINGS_ACTIVITY_REQUEST_CODE = 44;
     LoopbackAudioThread audioThread = null;
+    OutputAudioThread outputAudioThread =null;
+
     NativeAudioThread nativeAudioThread = null;
     private WavePlotView mWavePlotView;
 
@@ -128,6 +130,29 @@ public class LoopbackActivity extends Activity {
                         stopAudioThread();
                     }
                     break;
+                case OutputAudioThread.REC_STARTED:
+                    log("got message OUTPUT java rec started!!");
+                    showToast("OUTPUT Java Recording Started");
+                    refreshState();
+                    break;
+                case OutputAudioThread.REC_ERROR:
+                    log("got message OUTPUT java rec can't start!!");
+                    showToast("OUTPUT Java Recording Error. Please try again");
+                    refreshState();
+                    stopAudioThread();
+                    break;
+                case OutputAudioThread.REC_COMPLETE:
+                    if(outputAudioThread != null) {
+                        mWaveData = outputAudioThread.getWaveData();
+                        mSamplingRate = outputAudioThread.mSamplingRate;
+                        log("got message OUTPUT java rec complete!!");
+                        refreshPlots();
+                        refreshState();
+                        showToast("OUTPUT Java Recording Completed");
+                        stopAudioThread();
+                    }
+                    break;
+
                 default:
                     log("Got message:"+msg.what);
                     break;
@@ -203,6 +228,17 @@ public class LoopbackActivity extends Activity {
             }
             nativeAudioThread = null;
         }
+        if (outputAudioThread != null) {
+            outputAudioThread.isRunning = false;
+            // isRunning = false;
+            try {
+                outputAudioThread.finish();
+                outputAudioThread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            outputAudioThread = null;
+        }
         System.gc();
     }
 
@@ -242,6 +278,11 @@ public class LoopbackActivity extends Activity {
                 busy = true;
         }
 
+        if( outputAudioThread != null) {
+            if(outputAudioThread.isRunning)
+                busy = true;
+        }
+
         return busy;
      }
 
@@ -260,22 +301,35 @@ public class LoopbackActivity extends Activity {
         log(" current sampling rate: " + samplingRate);
         stopAudioThread();
 
+        int audioThreadType = getApp().getAudioThreadType();
+        int micSourceMapped = getApp().mapMicSource(audioThreadType ,micSource);
+
         //select if java or native audio thread
-        if (getApp().getAudioThreadType() == LoopbackApplication.AUDIO_THREAD_TYPE_JAVA ) {
-            int micSourceMapped = getApp().mapMicSource(LoopbackApplication.AUDIO_THREAD_TYPE_JAVA ,micSource);
-            audioThread = new LoopbackAudioThread();
-            audioThread.setMessageHandler(mMessageHandler);
-            audioThread.mSessionId = sessionId;
-            audioThread.setParams(samplingRate, playbackBuffer, recordBuffer,micSourceMapped);
-            audioThread.start();
-        } else {
-            int micSourceMapped = getApp().mapMicSource(LoopbackApplication.AUDIO_THREAD_TYPE_NATIVE ,micSource);
-            nativeAudioThread = new NativeAudioThread();
-            nativeAudioThread.setMessageHandler(mMessageHandler);
-            nativeAudioThread.mSessionId = sessionId;
-            nativeAudioThread.setParams(samplingRate, playbackBuffer, recordBuffer,micSourceMapped);
-            nativeAudioThread.start();
+        switch(audioThreadType) {
+            case LoopbackApplication.AUDIO_THREAD_TYPE_JAVA:
+                audioThread = new LoopbackAudioThread();
+                audioThread.setMessageHandler(mMessageHandler);
+                audioThread.mSessionId = sessionId;
+                audioThread.setParams(samplingRate, playbackBuffer, recordBuffer,micSourceMapped);
+                audioThread.start();
+                break;
+            case LoopbackApplication.AUDIO_THREAD_TYPE_NATIVE:
+                nativeAudioThread = new NativeAudioThread();
+                nativeAudioThread.setMessageHandler(mMessageHandler);
+                nativeAudioThread.mSessionId = sessionId;
+                nativeAudioThread.setParams(samplingRate, playbackBuffer, recordBuffer,micSourceMapped);
+                nativeAudioThread.start();
+                break;
+            case LoopbackApplication.AUDIO_THREAD_TYPE_OUTPUT_JAVA:
+                outputAudioThread = new OutputAudioThread();
+                outputAudioThread.setMessageHandler(mMessageHandler);
+                outputAudioThread.setContext(getApplicationContext());
+                outputAudioThread.mSessionId = sessionId;
+                outputAudioThread.setParams(samplingRate, playbackBuffer, recordBuffer,micSourceMapped);
+                outputAudioThread.start();
+                break;
         }
+
         mWavePlotView.setSamplingRate( samplingRate);
 
 
@@ -293,15 +347,28 @@ public class LoopbackActivity extends Activity {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            if (getApp().getAudioThreadType() == LoopbackApplication.AUDIO_THREAD_TYPE_JAVA) {
-                if (audioThread != null) {
-                    audioThread.runTest();
-                }
-            } else {
-                if (nativeAudioThread != null) {
-                    nativeAudioThread.runTest();
-                }
+
+            int audioThreadType = getApp().getAudioThreadType();
+
+            switch(audioThreadType) {
+                case LoopbackApplication.AUDIO_THREAD_TYPE_JAVA:
+                    if (audioThread != null) {
+                        audioThread.runTest();
+                    }
+                    break;
+                case LoopbackApplication.AUDIO_THREAD_TYPE_NATIVE:
+                    if (nativeAudioThread != null) {
+                        nativeAudioThread.runTest();
+                    }
+                    break;
+                case LoopbackApplication.AUDIO_THREAD_TYPE_OUTPUT_JAVA:
+                    if (outputAudioThread != null) {
+                        outputAudioThread.runTest();
+                    }
+                    break;
             }
+
+
         } else {
             //please wait, or restart application.
 //            Toast.makeText(getApplicationContext(), "Test in progress... please wait",
@@ -477,6 +544,11 @@ public class LoopbackActivity extends Activity {
                 s.append(" Frames: " + playbackBuffer);
                 s.append(" Audio: NATIVE");
                 break;
+            case LoopbackApplication.AUDIO_THREAD_TYPE_OUTPUT_JAVA:
+                s.append(" Play Frames: " + playbackBuffer);
+                s.append(" Record Frames: " + recordBuffer);
+                s.append(" Audio: OUTPUT JAVA");
+                break;
         }
 
         //mic source
@@ -520,8 +592,6 @@ public class LoopbackActivity extends Activity {
     }
 
     void saveToWavefile(Uri uri) {
-
-       // double [] data = audioThread.getWaveData();
         if (mWaveData != null && mWaveData.length > 0 ) {
             AudioFileOutput audioFileOutput = new AudioFileOutput(getApplicationContext(), uri,
                     mSamplingRate);
@@ -529,12 +599,8 @@ public class LoopbackActivity extends Activity {
 
             if (status) {
                 showToast("Finished exporting wave File");
-//                Toast.makeText(getApplicationContext(), "Finished exporting wave File",
-//                        Toast.LENGTH_SHORT).show();
             } else {
                 showToast("Something failed saving wave file");
-//                Toast.makeText(getApplicationContext(), "Something failed saving wave file",
-//                        Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -558,14 +624,10 @@ public class LoopbackActivity extends Activity {
             View v = LL.getRootView();
             v.setDrawingCacheEnabled(true);
             Bitmap b = v.getDrawingCache();
-            //BitmapDrawable bitmapDrawable = new BitmapDrawable(b);
 
             //save
             b.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-//            int sampleCount = data.length;
-//            writeHeader(sampleCount);
-//            writeDataBufer(data);
-//            mOutputStream.close();
+
             status = true;
             parcelFileDescriptor.close();
         } catch (Exception e) {
